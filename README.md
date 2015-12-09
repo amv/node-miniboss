@@ -15,7 +15,7 @@ This starts the server listening to the standard Gearman port 4730. Or with an a
 
 ## What is Miniboss
 
-Miniboss is a distributed job server, much like [Gearman](http://gearman.org/). It uses the Gearman protocol to talk to clients and workers, but it is not a full Gearman server implementation, and will purposefully stay that way.
+Miniboss is a distributed job server, much like [Gearman](http://gearman.org/). It uses the Gearman protocol to talk to clients and workers (with some optional extensions), but it is not a full Gearman server implementation, and will purposefully stay that way.
 
 At some point we will have a link here, which will lead to a tutorial on how Miniboss works with Worker processes and Client processes. But for now we just expect that you know how Gearman foreground jobs work, and on a high level Miniboss works exactly the same way.
 
@@ -32,6 +32,12 @@ Miniboss does not send stateless HTTP requests to the void and hope the servers 
 Don't really understand how the http pool failover algorithms work and why you sometimes get random erros and delays? Too cheap to fork cash for the high availability features of nginx?
 
 If your Worker dies, it just does not request more work. Simple. If your Worker is busy processing something, it does not request more work. Simple. All you need to do is make sure you spin up enough workers to match your load.
+
+### YES: Polyglot microservices
+
+Tired of some TrendyLanguageOfTheSeason always having a better SDKs available for some new service APIs?
+
+Stop worrying and learn to love your simple TrendyWorker! Make the API requests through your TrendyWorker and use the Miniboss binary protocol to send JSON, BSON or whatever your heart desires over the wire before handling the results in your trusty LegacyWorker code.
 
 ### YES: Work parallelization
 
