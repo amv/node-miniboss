@@ -21,6 +21,7 @@ Here are the command line parameters and their defaults:
       --otp-client-port 47301 --otp-client-host 0.0.0.0 \
       --worker-port 47302 --worker-host 0.0.0.0 \
       --otp-worker-port 47303 --otp-worker-host 0.0.0.0 \
+      --max-packet-size 2M
 
 ## What is Miniboss
 
@@ -38,7 +39,7 @@ Miniboss does not send stateless HTTP requests to the void and hope the servers 
 
 ### YES: Internal load balancing and failover
 
-Don't really understand how the http pool failover algorithms work and why you sometimes get random erros and delays? Too cheap to fork cash for the high availability features of nginx?
+Don't really understand how the http pool failover algorithms work and why you sometimes get random erros and delays? Too cheap to fork cash for the complicated high availability features of nginx?
 
 If your Worker dies, it just does not request more work. Simple. If your Worker is busy processing something, it does not request more work. Simple. All you need to do is make sure you spin up enough workers to match your load.
 
@@ -56,13 +57,17 @@ The Miniboss approach is to start by fetching only the ID of the latest 20 posts
 
 The benefits? The code to fetch the individual data bits becomes trivial to write. You will easily gain good understanding of the performance of each request type, which helps pinpointing areas to optimize. Cache implementations become easier as data is already split to smaller logical chunks.. And the parallelization probably nets your end users faster responses than traditional sequential approaches. 
 
-### NO: file uploads & big payloads
+### NO: Huge payloads
 
-Miniboss holds all routing data in memory for the duration of the request so it is not a good idea to pass big amounts of data through Miniboss. Please use a backing system like S3 or a database to hold the data and just pass pointers to the data through Miniboss.
+For most usecases it is very important for the Miniboss cluster to stay performant in order to deliver microservice responses in milliseconds. Sending huge blogs of information (like video files) through Miniboss requires a lot of resources from the server during the routing phase, and this might negatively impact the delivery of your other services. For this reason the maximum packet size is set by default to 2 megabytes.
 
-### NO: direct client access
+While the job response can be delivered using many consecutive smaller packets to implement "streaming" workers, and there are unfinished plans to allow also providing the job data in small consecutive packets, it is still many times a lot easier to use external systems to transmit bigger payloads. For example you can store the data services like S3 or your main database, and just pass pointers to this data through Miniboss.
 
-Miniboss does not have any security layers built in. If you can access the router, you can access all of the functions published in it. There are also no rate limiting features, so all of your clients and workers should behave nicely.
+### NO: Direct client access
+
+Miniboss does not have any rate limiting or ddos prevention features, so it is not advisable to allow untrusted clients unlimited access to the Miniboss server.
+
+Miniboss does implement some isolation of responsibilities by providing separate ports that can be used solely for providing work, or solely for consuming work. Miniboss also implements a one-time-password scheme for situations where it is important to restrict user access to the server in environments where owner of the environment changes from privileged to non-privileged (like when running customer submitted code within a worker).
 
 ## How does Miniboss differ from Gearman
 
