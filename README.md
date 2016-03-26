@@ -16,11 +16,10 @@ This starts the server listening to the standard Gearman port 4730, along with o
 Here are the command line parameters and their defaults:
 
     miniboss \
-      --port 4730 --host 0.0.0.0 \
-      --client-port 47300 --client-host 0.0.0.0 \
-      --otp-client-port 47301 --otp-client-host 0.0.0.0 \
+      --port        4730  --host        0.0.0.0 \
+      --otp-port    47300 --otp-host    0.0.0.0 \
+      --client-port 47301 --client-host 0.0.0.0 \
       --worker-port 47302 --worker-host 0.0.0.0 \
-      --otp-worker-port 47303 --otp-worker-host 0.0.0.0 \
       --max-packet-size 2M
 
 ## What is Miniboss
