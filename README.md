@@ -4,7 +4,7 @@ A distributed job server heavily inspired by [Gearman](http://gearman.org/)
 
 ## Vaporware notice
 
-This readme acts as a project specification. The server will be done when it will be done.
+This readme acts as a project specification. Only small parts of the server are implemented at this point.
 
 ## Installation
 
@@ -12,7 +12,7 @@ This starts the server listening to the standard Gearman port 4730, along with o
 
     npm install -g miniboss
     miniboss
-    
+
 Here are the command line parameters and their defaults:
 
     miniboss \
@@ -38,7 +38,7 @@ Miniboss does not send stateless HTTP requests to the void and hope the servers 
 
 ### YES: Internal load balancing and failover
 
-Don't really understand how the http pool failover algorithms work and why you sometimes get random erros and delays? Too cheap to fork cash for the complicated high availability features of nginx?
+Don't really understand how the http pool failover algorithms work and why you sometimes get random errors and delays? Too cheap to fork cash for the complicated high availability features of Nginx?
 
 If your Worker dies, it just does not request more work. Simple. If your Worker is busy processing something, it does not request more work. Simple. All you need to do is make sure you spin up enough workers to match your load.
 
@@ -54,7 +54,7 @@ Need to quickly fetch 20 blog posts with associated data on author, comments and
 
 The Miniboss approach is to start by fetching only the ID of the latest 20 posts. Once you get the list of the IDs, create 4 separate requests to gather the post data, the author data, the comment data and the category data for each of the IDs. In total you should end up with 80 requests that you then shoot all concurrently to Miniboss. When the requests come back, you just merge the results to get your final data.
 
-The benefits? The code to fetch the individual data bits becomes trivial to write. You will easily gain good understanding of the performance of each request type, which helps pinpointing areas to optimize. Cache implementations become easier as data is already split to smaller logical chunks.. And the parallelization probably nets your end users faster responses than traditional sequential approaches. 
+The benefits? The code to fetch the individual data bits becomes trivial to write. You will easily gain good understanding of the performance of each request type, which helps pinpointing areas to optimize. Cache implementations become easier as data is already split to smaller logical chunks.. And the parallelization probably nets your end users faster responses than traditional sequential approaches.
 
 ### NO: Huge payloads
 
@@ -72,7 +72,7 @@ Miniboss does implement some isolation of responsibilities by providing separate
 
 Miniboss does NOT support background jobs or uniqueness constraints. Miniboss also comes out of the box with support for many helpful Gearman protocol additions that allow speedier recovery in multitude of failure scenarios.
 
-Miniboss has been purposefully built so that you can use existing gearman libraries to get started with simple foreground jobs, but when you notice that you need more fidelity in failure scenarios, you can extend the libraries "to use the boss mode" ;)
+Miniboss has been purposefully built so that you can use existing Gearman libraries to get started with simple foreground jobs, but when you notice that you need more fidelity in failure scenarios, you can extend the libraries "to use the boss mode" ;)
 
 ### But I need background jobs and uniqueness constraints!
 
@@ -109,11 +109,11 @@ However the development of the Gearman daemons have in the recent years veered t
 
 Due to the background execution logic, operators need to know wether there are unexecuted background jobs waiting in the memory of the process and thus if the server can safely be shut down without losing something. If the operator has set up some sort of a persistence layer for the background jobs, failed servers can no longer be just replaced with a freshly bootstrapped ones, and crashed servers might need to go through lengthy processes of sorting through corrupted database files.
 
-Miniboss takes the opinnionated stance that in order to achieve a reliable system, the routing server should not contain any such state, that some other party is not responsible for recovering from the loss of that state. To enforce this, Miniboss drops the support of background jobs completely. Because this leaves us with only foreground jobs, and Client code is responsible for handling the retries and error situations in case of broken connections, the operators can work on the assumption that Miniboss servers are completely stateless routing units. Hooray for easy maintenance! Just cut the power and bootstrap a new Miniboss Docker image to replace your outdated and failed Minibosses, and you are done!
+Miniboss takes the opinionated stance that in order to achieve a reliable system, the routing server should not contain any such state, that some other party is not responsible for recovering from the loss of that state. To enforce this, Miniboss drops the support of background jobs completely. Because this leaves us with only foreground jobs, and Client code is responsible for handling the retries and error situations in case of broken connections, the operators can work on the assumption that Miniboss servers are completely stateless routing units. Hooray for easy maintenance! Just cut the power and bootstrap a new Miniboss Docker image to replace your outdated and failed Minibosses, and you are done!
 
 ### Fast failovers
 
-Miniboss comes out of the box with a Gearman protocol extension for SUBMIT_JOB_MSTIMEOUT that allows Clients to submit jobs with a routing timeout. This means that if the Client submits a job with a 20 millisecond routing timeout and Miniboss responds with a ROUTING_TIMEOUT, the Client can be absolutely sure the job was not assigned to any worker, and a different Miniboss can be contacted to relay the job.
+Miniboss comes out of the box with a Gearman protocol extension for SUBMIT\_JOB\_MSTIMEOUT that allows Clients to submit jobs with a routing timeout. This means that if the Client submits a job with a 20 millisecond routing timeout and Miniboss responds with a ROUTING_TIMEOUT, the Client can be absolutely sure the job was not assigned to any worker, and a different Miniboss can be contacted to relay the job.
 
 The Client can add a bit of time to the routing timeout after each failure, which allows Clients to start with a very slow routing timeout. This allows quickly bypassing those Minibosses, which for some reason can not route the job quickly (or at all), but should still work pretty well in the case of real Worker overload.
 
@@ -131,12 +131,14 @@ This is way down the roadmap, but the idea would be to have zero configuration o
 
 Instead of configuration, we would allow workers to signal their area tags, and clients to signal their area tag priority queue. Workers in DC1 would signal "IDENTIFY\_AREA DC1", and Clients in DC1 would signal "AREA\_PRIORITY DC1,DC3". After this all jobs arriving from Clients in DC1 would be passed on only to Workers that have identified their area as DC1. If the routing timeout elapses, the job would be passed to Workers with area DC3, and after that to all other workers.
 
-This would effectively tripple the requested routing timeout (double if only one AREA\_PRIORITY tag is posted), but having a different timeouts for these might be too much. One alternative might be to have something like AREA\_PRIORITY\_TIMEOUT DC1,100,DC3,200 and have the routing timeout work as previously.
+This would effectively triple the requested routing timeout (double if only one AREA\_PRIORITY tag is posted), but having a different timeouts for these might be too much. One alternative might be to have something like AREA\_PRIORITY\_TIMEOUT DC1,100,DC3,200 and have the routing timeout work as previously.
 
-There is also no reason why Workers should not be able to post more than one area indentificator.
+There is also no reason why Workers should not be able to post more than one area identifier.
 
-Much of the weight on proper implementation rests on the shoulders of the Clien timplementation though, and it should be thought out well before advancing with this.
+Much of the weight on proper implementation rests on the shoulders of the Client implementation though, and it should be thought out well before advancing with this.
+
+This might also be a stupid idea, as most of the effect we are looking for could be achieved only by maintaining some statistics of how fast different servers respond to client pings, and how fast workers respond to server pings, and doing some crude prioritization based on these.
 
 ## Are there other Miniboss implementations?
 
-Probably not yet! Maybe you could build one with your favourite language?
+Probably not yet! Maybe you could build one with your favorite language?

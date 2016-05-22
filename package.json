@@ -1,0 +1,33 @@
+{
+  "name": "node-miniboss",
+  "version": "0.0.1",
+  "description": "A distributed job server heavily inspired by [Gearman](http://gearman.org/)",
+  "main": "server.js",
+  "bin": {
+      "miniboss" : "./server.js"
+  },
+  "scripts": {
+    "test": "tap test/*.js",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amv/node-miniboss.git"
+  },
+  "author": "Antti Vähäkotamäki (https://github.com/amv/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/amv/node-miniboss/issues"
+  },
+  "homepage": "https://github.com/amv/node-miniboss#readme",
+  "devDependencies": {
+    "abraxas": "^2.1.9",
+    "tap": "^5.7.1"
+  },
+  "dependencies": {
+    "gearman-packet": "1.0.3",
+    "minimist": "1.2.0",
+    "through2": "2.0.1",
+    "uuid": "2.0.2"
+  }
+}
