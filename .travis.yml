@@ -4,3 +4,4 @@ node_js:
 cache:
   directories:
   - $HOME/.npm
+sudo: false
