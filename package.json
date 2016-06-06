@@ -1,7 +1,7 @@
 {
   "name": "node-miniboss",
   "version": "0.1.0",
-  "description": "A distributed job server heavily inspired by [Gearman](http://gearman.org/)",
+  "description": "A distributed job server heavily inspired by Gearman",
   "main": "server.js",
   "bin": {
     "miniboss": "./server.js"
