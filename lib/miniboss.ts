@@ -91,14 +91,14 @@ class Miniboss extends events.EventEmitter {
             this.connections[id].broadcast_job( job );
         }
     }
-    find_job_for_worker( worker : MinibossConnection ) {
+    find_job_for_worker( worker_handler : MinibossWorkerHandler ) {
         for ( let id in this.connections ) {
-            this.connections[id].broadcast_pending_jobs_to_worker( worker );
+            this.connections[id].broadcast_pending_jobs_to_worker( worker_handler );
         }
     }
-    assign_job_for_worker( worker : MinibossConnection, uniq : boolean ) {
+    assign_job_for_worker( worker_handler : MinibossWorkerHandler, uniq : boolean ) {
         for ( let id in this.connections ) {
-            this.connections[id].assign_pending_job_to_worker( worker, uniq );
+            this.connections[id].assign_pending_job_to_worker( worker_handler, uniq );
         }
     }
 }
@@ -109,16 +109,16 @@ class MinibossConnection {
     private socket: net.Socket;
     private output_packet_stream: stream.Duplex;
     private common_handler: MinibossCommonPacketHandler;
-    private worker_handler: MinibossWorkerPacketHandler;
-    private client_handler: MinibossClientPacketHandler;
+    private worker_handler: MinibossWorkerHandler;
+    private client_handler: MinibossClientHandler;
 
     constructor( miniboss: Miniboss, socket: net.Socket ) {
         this._miniboss = miniboss;
         this.socket = socket;
 
         this.common_handler = new MinibossCommonPacketHandler( miniboss, this );
-        this.worker_handler = new MinibossWorkerPacketHandler( miniboss, this );
-        this.client_handler = new MinibossClientPacketHandler( miniboss, this );
+        this.worker_handler = new MinibossWorkerHandler( miniboss, this );
+        this.client_handler = new MinibossClientHandler( miniboss, this );
 
         this._id = uuid.v4();
 
@@ -136,25 +136,23 @@ class MinibossConnection {
 
     id() { return this._id; }
     miniboss() { return this._miniboss; }
-    capability_names() { return this.worker_handler.capability_names(); }
-    wake_up() { return this.worker_handler.wake_up(); }
     handle_job( job : MinibossJob, uniq: boolean ) { return this.worker_handler.handle_job( job, uniq ); }
 
     broadcast_job( job : MinibossJob ) {
         if ( this.worker_handler.is_asleep() && this.worker_handler.can_do( job ) ) {
-            this.wake_up();
+            this.worker_handler.wake_up();
         }
     }
 
-    broadcast_pending_jobs_to_worker( worker : MinibossConnection ) {
+    broadcast_pending_jobs_to_worker( worker_handler : MinibossWorkerHandler ) {
         if ( this.client_handler.has_pending_jobs() ) {
-            this.client_handler.broadcast_jobs_to_worker( worker );
+            this.client_handler.broadcast_jobs_to_worker( worker_handler );
         }
     }
 
-    assign_pending_job_to_worker( worker : MinibossConnection, uniq : boolean ) {
+    assign_pending_job_to_worker( worker_handler : MinibossWorkerHandler, uniq : boolean ) {
         if ( this.client_handler.has_pending_jobs() ) {
-            this.client_handler.assign_job_to_worker( worker, uniq );
+            this.client_handler.assign_job_to_worker( worker_handler, uniq );
         }
     }
 
@@ -225,7 +223,7 @@ class MinibossCommonPacketHandler extends MinibossPacketHandler {
     }
 }
 
-class MinibossClientPacketHandler extends MinibossPacketHandler  {
+class MinibossClientHandler extends MinibossPacketHandler  {
     private pending_jobs: { [ id : string ] : MinibossJob } = {};
     private pending_jobs_by_function_name: { [ function_name : string ] : MinibossJob[] } = {};
 
@@ -253,19 +251,19 @@ class MinibossClientPacketHandler extends MinibossPacketHandler  {
         throw new Error("tried to unshift job for non-existing function_name: " + function_name);
     }
 
-    broadcast_jobs_to_worker( worker : MinibossConnection) {
-        for (let function_name of worker.capability_names() ) {
+    broadcast_jobs_to_worker( worker_handler : MinibossWorkerHandler) {
+        for (let function_name of worker_handler.capability_names() ) {
             if ( function_name in this.pending_jobs_by_function_name ) {
-                return worker.wake_up();
+                return worker_handler.wake_up();
             }
         }
     }
 
-    assign_job_to_worker( worker : MinibossConnection, uniq : boolean ) {
-        for (let function_name of worker.capability_names() ) {
+    assign_job_to_worker( worker_handler : MinibossWorkerHandler, uniq : boolean ) {
+        for (let function_name of worker_handler.capability_names() ) {
             if ( function_name in this.pending_jobs_by_function_name ) {
                 let job = this.shift_pending_job_for_function_name( function_name );
-                worker.handle_job( job, uniq );
+                worker_handler.handle_job( job, uniq );
                 return;
             }
         }
@@ -274,7 +272,7 @@ class MinibossClientPacketHandler extends MinibossPacketHandler  {
     handle_packet( packet ) {
         switch ( packet.type.name ) {
             case 'SUBMIT_JOB':
-                let job = MinibossJob.create_from_packet_and_client( packet, this.connection() );
+                let job = MinibossJob.create_from_packet_and_client( packet, this );
                 this.miniboss().register_job( job );
                 this.add_pending_job( job );
                 this.send_response('JOB_CREATED', { job : job.id() } );
@@ -284,7 +282,7 @@ class MinibossClientPacketHandler extends MinibossPacketHandler  {
     }
 }
 
-class MinibossWorkerPacketHandler extends MinibossPacketHandler {
+class MinibossWorkerHandler extends MinibossPacketHandler {
     private capabilities: { [ job_name: string ] : number } = {};
     private handled_jobs: { [ id : string ] : MinibossJob } = {};
     private _is_asleep: boolean;
@@ -298,7 +296,7 @@ class MinibossWorkerPacketHandler extends MinibossPacketHandler {
     }
     go_to_sleep() {
         this._is_asleep = true;
-        this.miniboss().find_job_for_worker( this.connection() );
+        this.miniboss().find_job_for_worker( this );
     }
     handle_job( job : MinibossJob, uniq : boolean ) {
         this.handled_jobs[ job.id() ] = job;
@@ -352,11 +350,11 @@ class MinibossWorkerPacketHandler extends MinibossPacketHandler {
 
 
             case 'GRAB_JOB':
-                this.miniboss().assign_job_for_worker( this.connection(), false );
+                this.miniboss().assign_job_for_worker( this, false );
             break;
 
             case 'GRAB_JOB_UNIQ':
-                this.miniboss().assign_job_for_worker( this.connection(), true );
+                this.miniboss().assign_job_for_worker( this, true );
             break;
         }
     }
@@ -380,24 +378,24 @@ class MinibossJob {
     private _id : string;
     private _function_name : string;
     private _body : Buffer | void;
-    private _client : MinibossConnection;
-    public worker : MinibossConnection;
+    private _client : MinibossClientHandler;
+    private _worker : MinibossWorkerHandler;
 
-    static create_from_packet_and_client( packet, client : MinibossConnection ) : MinibossJob {
-        let job = new MinibossJob( client, packet.args['function'], packet.body );
+    static create_from_packet_and_client( packet, client_handler : MinibossClientHandler ) : MinibossJob {
+        let job = new MinibossJob( client_handler, packet.args['function'], packet.body );
         return job;
     }
 
-    constructor( client : MinibossConnection, function_name: string, body : Buffer | void ) {
+    constructor( client_handler : MinibossClientHandler, function_name: string, body : Buffer | void ) {
         this._id = uuid.v4();
         this._function_name = function_name;
         this._body = body;
-        this._client = client;
+        this._client = client_handler;
     }
 
     id() { return this._id }
     function_name() { return this._function_name }
     body() { return this._body }
     client() { return this._client }
-
+    worker() { return this._worker }
 }
