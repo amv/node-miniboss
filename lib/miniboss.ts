@@ -286,13 +286,19 @@ class MinibossWorkerHandler extends MinibossPacketHandler {
     private capabilities: { [ job_name: string ] : number } = {};
     private handled_jobs: { [ id : string ] : MinibossJob } = {};
     private _is_asleep: boolean;
+    private _scheduled_wake_up: NodeJS.Timer;
 
     is_asleep() : boolean { return this._is_asleep }
     capability_names() : string[] { return Object.keys( this.capabilities ); }
 
     wake_up() {
         this._is_asleep = false;
-        this.send_response('NOOP', {});
+        if ( ! this._scheduled_wake_up ) {
+            this._scheduled_wake_up = setTimeout( () => {
+                this._scheduled_wake_up = null;
+                this.send_response('NOOP', {});
+            }, 0 );
+        }
     }
     go_to_sleep() {
         this._is_asleep = true;
